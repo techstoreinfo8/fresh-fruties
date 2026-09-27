@@ -1,83 +1,39 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 
 function Cart() {
-
-  const [cart, setCart] = useState([]);
-
-  useEffect(() => {
-
-    const savedCart =
-      JSON.parse(localStorage.getItem("cart")) || [];
-
-    setCart(savedCart);
-
-  }, []);
-
-  const updateQuantity = (id, change) => {
-
-    const updatedCart = cart
-      .map((item) => {
-
-        if (item.id === id) {
-
-          return {
-            ...item,
-            cartQuantity: Math.max(
-              1,
-              item.cartQuantity + change
-            )
-          };
-
-        }
-
-        return item;
-
-      });
-
-    setCart(updatedCart);
-
-    localStorage.setItem(
-      "cart",
-      JSON.stringify(updatedCart)
-    );
-  };
-
-  const removeItem = (id) => {
-
-    const updatedCart =
-      cart.filter((item) => item.id !== id);
-
-    setCart(updatedCart);
-
-    localStorage.setItem(
-      "cart",
-      JSON.stringify(updatedCart)
-    );
-  };
-
-  const total = cart.reduce(
-    (sum, item) =>
-      sum + item.price * item.cartQuantity,
-    0
-  );
+  const {
+    cart,
+    updateQuantity,
+    removeFromCart,
+    total
+  } = useCart();
 
   return (
     <section className="section cart-page">
 
       <div className="page-title">
-        <span>YOUR SHOPPING CART</span>
+        <span>
+          YOUR SHOPPING CART
+        </span>
+
         <h1>Shopping Cart</h1>
       </div>
 
       {cart.length === 0 ? (
 
         <div className="empty-cart">
+
           <div>🛒</div>
-          <h2>Your cart is empty</h2>
+
+          <h2>
+            Your cart is empty
+          </h2>
+
           <Link to="/fruits">
             Start Shopping
           </Link>
+
         </div>
 
       ) : (
@@ -86,89 +42,132 @@ function Cart() {
 
           <div className="cart-items">
 
-            {cart.map((item) => (
+            {cart.map((item) => {
 
-              <div
-                className="cart-item"
-                key={item.id}
-              >
+              const quantity =
+                Number(
+                  item.cartQuantity || 1
+                );
 
-                <div className="cart-emoji">
-                  {item.emoji}
-                </div>
+              const itemTotal =
+                Number(item.price || 0) *
+                quantity;
 
-                <div className="cart-details">
+              return (
+                <div
+                  className="cart-item"
+                  key={item.id}
+                >
 
-                  <h3>{item.name}</h3>
+                  <div className="cart-emoji">
+                    🍎
+                  </div>
 
-                  <p>
-                    ₹{item.price}/{item.unit}
-                  </p>
+                  <div className="cart-details">
 
-                </div>
+                    <h3>
+                      {item.name}
+                    </h3>
 
-                <div className="quantity">
+                    <p>
+                      ₹{item.price}/
+                      {item.unit}
+                    </p>
 
-                  <button
-                    onClick={() =>
-                      updateQuantity(item.id, -1)
-                    }
-                  >
-                    −
-                  </button>
+                  </div>
+
+                  <div className="quantity">
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateQuantity(
+                          item.id,
+                          -1
+                        )
+                      }
+                    >
+                      −
+                    </button>
+
+                    <strong>
+                      {quantity}
+                    </strong>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateQuantity(
+                          item.id,
+                          1
+                        )
+                      }
+                    >
+                      +
+                    </button>
+
+                  </div>
 
                   <strong>
-                    {item.cartQuantity}
+                    ₹{itemTotal.toFixed(2)}
                   </strong>
 
                   <button
+                    type="button"
+                    className="remove-button"
                     onClick={() =>
-                      updateQuantity(item.id, 1)
+                      removeFromCart(
+                        item.id
+                      )
                     }
                   >
-                    +
+                    Remove
                   </button>
 
                 </div>
-
-                <strong>
-                  ₹{item.price * item.cartQuantity}
-                </strong>
-
-                <button
-                  className="remove-button"
-                  onClick={() =>
-                    removeItem(item.id)
-                  }
-                >
-                  Remove
-                </button>
-
-              </div>
-
-            ))}
+              );
+            })}
 
           </div>
 
           <div className="cart-summary">
 
-            <h2>Order Summary</h2>
+            <h2>
+              Order Summary
+            </h2>
 
             <div>
-              <span>Subtotal</span>
-              <strong>₹{total}</strong>
+              <span>
+                Subtotal
+              </span>
+
+              <strong>
+                ₹{total.toFixed(2)}
+              </strong>
             </div>
 
             <div>
-              <span>Delivery</span>
-              <strong>Free</strong>
+              <span>
+                Delivery
+              </span>
+
+              <strong>
+                Free
+              </strong>
             </div>
 
             <hr />
 
             <div className="total">
-              <span>Total</span>
-              <strong>₹{total}</strong>
+
+              <span>
+                Total
+              </span>
+
+              <strong>
+                ₹{total.toFixed(2)}
+              </strong>
+
             </div>
 
             <Link

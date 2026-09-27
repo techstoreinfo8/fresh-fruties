@@ -1,17 +1,107 @@
 import { useEffect, useState } from "react";
 
-function Orders() {
+const API_BASE_URL = "http://localhost:8080/api";
 
+function Orders() {
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-
-    const savedOrders =
-      JSON.parse(localStorage.getItem("orders")) || [];
-
-    setOrders(savedOrders.reverse());
-
+    fetchOrders();
   }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(`${API_BASE_URL}/orders`);
+
+      if (!response.ok) {
+        throw new Error("Failed to load orders.");
+      }
+
+      const data = await response.json();
+
+      // Show newest orders first
+      const sortedOrders = [...data].sort((a, b) => {
+        return (
+          new Date(b.orderDate || 0) -
+          new Date(a.orderDate || 0)
+        );
+      });
+
+      setOrders(sortedOrders);
+    } catch (err) {
+      console.error("Orders error:", err);
+      setError(
+        err.message || "Unable to load orders."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "N/A";
+
+    return new Date(date).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
+  const formatAmount = (amount) => {
+    return Number(amount || 0).toFixed(2);
+  };
+
+  if (loading) {
+    return (
+      <section className="section orders-page">
+        <div className="page-title">
+          <span>ORDER HISTORY</span>
+          <h1>My Orders</h1>
+          <p>Track your Fresh Fruities orders.</p>
+        </div>
+
+        <div className="empty-cart">
+          <div>⏳</div>
+          <h2>Loading orders...</h2>
+          <p>Please wait.</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="section orders-page">
+        <div className="page-title">
+          <span>ORDER HISTORY</span>
+          <h1>My Orders</h1>
+          <p>Track your Fresh Fruities orders.</p>
+        </div>
+
+        <div className="empty-cart">
+          <div>⚠️</div>
+          <h2>Unable to load orders</h2>
+          <p>{error}</p>
+
+          <button
+            type="button"
+            className="checkout-button"
+            onClick={fetchOrders}
+          >
+            Try Again
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="section orders-page">
@@ -44,19 +134,24 @@ function Orders() {
               <div className="order-header">
 
                 <div>
-                  <span>ORDER ID</span>
-                  <h3>{order.id}</h3>
+                  <span>ORDER NUMBER</span>
+                  <h3>
+                    {order.orderNumber || order.id}
+                  </h3>
                 </div>
 
                 <div>
                   <span>DATE</span>
-                  <p>{order.date}</p>
+                  <p>
+                    {formatDate(order.orderDate)}
+                  </p>
                 </div>
 
                 <div>
                   <span>STATUS</span>
+
                   <strong className="status-badge">
-                    {order.status}
+                    {order.status || "PENDING"}
                   </strong>
                 </div>
 
@@ -64,37 +159,34 @@ function Orders() {
 
               <div className="order-products">
 
-                {order.items.map((item) => (
+                <div className="order-product">
 
-                  <div
-                    className="order-product"
-                    key={item.id}
-                  >
-                    <span>
-                      {item.emoji} {item.name}
-                    </span>
+                  <span>
+                    Order #{order.orderNumber}
+                  </span>
 
-                    <span>
-                      × {item.cartQuantity}
-                    </span>
+                  <span>
+                    Customer ID: {order.customerId}
+                  </span>
 
-                    <strong>
-                      ₹{item.price * item.cartQuantity}
-                    </strong>
-                  </div>
+                  <strong>
+                    ₹{formatAmount(order.totalAmount)}
+                  </strong>
 
-                ))}
+                </div>
 
               </div>
 
               <div className="order-footer">
 
                 <span>
-                  Payment: {order.customer.payment}
+                  Payment:{" "}
+                  {order.paymentStatus || "PENDING"}
                 </span>
 
                 <strong>
-                  Total: ₹{order.total}
+                  Total: ₹
+                  {formatAmount(order.totalAmount)}
                 </strong>
 
               </div>

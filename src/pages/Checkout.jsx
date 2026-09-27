@@ -1,205 +1,345 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
+import "./Checkout.css";
+
+
+const API_BASE_URL = "http://localhost:8080/api";
 
 function Checkout() {
   const navigate = useNavigate();
 
-  const cart =
-    JSON.parse(localStorage.getItem("cart")) || [];
+  const {
+    cart,
+    total,
+    clearCart
+  } = useCart();
 
   const [customer, setCustomer] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
-    city: "",
-    pincode: "",
-    payment: "Cash on Delivery"
+    city: ""
   });
 
-  const total = cart.reduce(
-    (sum, item) => sum + item.price * item.cartQuantity,
-    0
-  );
+  const [payment, setPayment] = useState("PENDING");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setCustomer({
-      ...customer,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+
+    setCustomer((previous) => ({
+      ...previous,
+      [name]: value
+    }));
   };
 
-  const placeOrder = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (cart.length === 0) {
       alert("Your cart is empty.");
-      navigate("/fruits");
       return;
     }
 
-    const existingOrders =
-      JSON.parse(localStorage.getItem("orders")) || [];
+    if (!customer.name.trim()) {
+      alert("Please enter customer name.");
+      return;
+    }
 
-    const order = {
-      id: `ORD-${Date.now()}`,
-      customer,
-      items: cart,
-      total,
-      status: "Pending",
-      date: new Date().toLocaleString()
-    };
+    setLoading(true);
 
-    existingOrders.push(order);
+    try {
+      // -------------------------------------------------
+      // STEP 1: Create customer in MySQL
+      // -------------------------------------------------
 
-    localStorage.setItem(
-      "orders",
-      JSON.stringify(existingOrders)
-    );
+      const customerResponse = await fetch(
+        `${API_BASE_URL}/customers`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: customer.name,
+            phone: customer.phone,
+            email: customer.email,
+            address: customer.address,
+            city: customer.city,
+            active: true
+          })
+        }
+      );
 
-    localStorage.removeItem("cart");
+      if (!customerResponse.ok) {
+        throw new Error("Failed to create customer.");
+      }
 
-    alert(
-      `Order placed successfully!\nOrder ID: ${order.id}`
-    );
+      const savedCustomer = await customerResponse.json();
 
-    navigate("/orders");
+      console.log("Customer created:", savedCustomer);
+
+      // -------------------------------------------------
+      // STEP 2: Create order
+      // -------------------------------------------------
+
+      const orderNumber = `ORD-${Date.now()}`;
+
+      const checkoutRequest = {
+        customerId: savedCustomer.id,
+        orderNumber: orderNumber,
+        totalAmount: total,
+        paymentStatus: payment,
+        items: cart.map((item) => ({
+          productId: Number(item.id),
+          quantity: Number(item.cartQuantity)
+        }))
+      };
+
+      console.log("Checkout request:", checkoutRequest);
+
+      const orderResponse = await fetch(
+        `${API_BASE_URL}/orders/checkout`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(checkoutRequest)
+        }
+      );
+
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+
+        throw new Error(
+          errorText || "Failed to place order."
+        );
+      }
+
+      const savedOrder = await orderResponse.json();
+
+      console.log("Order created:", savedOrder);
+
+      // -------------------------------------------------
+      // STEP 3: Clear React cart
+      // -------------------------------------------------
+
+      clearCart();
+
+      alert(
+        `Order placed successfully!\nOrder Number: ${orderNumber}`
+      );
+
+      navigate("/orders");
+
+    } catch (error) {
+      console.error("Checkout error:", error);
+
+      alert(
+        error.message ||
+        "Unable to place order. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <section className="section checkout-page">
-
-      <div className="page-title">
-        <span>ORDER CHECKOUT</span>
-        <h1>Checkout</h1>
-        <p>Enter your delivery details to place your order.</p>
-      </div>
-
-      <div className="checkout-layout">
-
-        <form
-          className="checkout-form"
-          onSubmit={placeOrder}
-        >
-
-          <h2>Delivery Information</h2>
-
-          <label>Full Name</label>
-          <input
-            name="name"
-            value={customer.name}
-            onChange={handleChange}
-            placeholder="Enter your name"
-            required
-          />
-
-          <label>Phone Number</label>
-          <input
-            name="phone"
-            value={customer.phone}
-            onChange={handleChange}
-            placeholder="Enter phone number"
-            required
-          />
-
-          <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            value={customer.email}
-            onChange={handleChange}
-            placeholder="Enter email"
-            required
-          />
-
-          <label>Delivery Address</label>
-          <textarea
-            name="address"
-            value={customer.address}
-            onChange={handleChange}
-            placeholder="House / Street / Area"
-            required
-          />
-
-          <div className="checkout-row">
-
-            <div>
-              <label>City</label>
-              <input
-                name="city"
-                value={customer.city}
-                onChange={handleChange}
-                placeholder="City"
-                required
-              />
-            </div>
-
-            <div>
-              <label>Pincode</label>
-              <input
-                name="pincode"
-                value={customer.pincode}
-                onChange={handleChange}
-                placeholder="Pincode"
-                required
-              />
-            </div>
-
-          </div>
-
-          <label>Payment Method</label>
-
-          <select
-            name="payment"
-            value={customer.payment}
-            onChange={handleChange}
-          >
-            <option>Cash on Delivery</option>
-            <option>UPI</option>
-            <option>Credit / Debit Card</option>
-          </select>
+  if (cart.length === 0) {
+    return (
+      <div className="checkout-page">
+        <div className="empty-checkout">
+          <h2>Your cart is empty</h2>
 
           <button
-            type="submit"
-            className="place-order-button"
+            type="button"
+            onClick={() => navigate("/fruits")}
+            className="checkout-button"
           >
-            🛍️ Place Order
+            Continue Shopping
           </button>
+        </div>
+      </div>
+    );
+  }
 
-        </form>
+  return (
+    <div className="checkout-page">
 
-        <div className="checkout-summary">
+      <div className="checkout-container">
 
-          <h2>Order Summary</h2>
+        <div className="checkout-left">
 
-          {cart.map((item) => (
-            <div
-              className="summary-item"
-              key={item.id}
+          <h1>Checkout</h1>
+
+          <form onSubmit={handleSubmit}>
+
+            <div className="checkout-section">
+
+              <h2>Customer Details</h2>
+
+              <div className="form-group">
+                <label>Full Name *</label>
+
+                <input
+                  type="text"
+                  name="name"
+                  value={customer.name}
+                  onChange={handleChange}
+                  placeholder="Enter your name"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Phone</label>
+
+                <input
+                  type="tel"
+                  name="phone"
+                  value={customer.phone}
+                  onChange={handleChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Email</label>
+
+                <input
+                  type="email"
+                  name="email"
+                  value={customer.email}
+                  onChange={handleChange}
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Address</label>
+
+                <textarea
+                  name="address"
+                  value={customer.address}
+                  onChange={handleChange}
+                  placeholder="Enter delivery address"
+                  rows="3"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>City</label>
+
+                <input
+                  type="text"
+                  name="city"
+                  value={customer.city}
+                  onChange={handleChange}
+                  placeholder="Enter city"
+                />
+              </div>
+
+            </div>
+
+            <div className="checkout-section">
+
+              <h2>Payment Method</h2>
+
+              <div className="payment-options">
+
+                <label className="payment-option">
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="PENDING"
+                    checked={payment === "PENDING"}
+                    onChange={(e) =>
+                      setPayment(e.target.value)
+                    }
+                  />
+
+                  <span>Cash on Delivery</span>
+                </label>
+
+                <label className="payment-option">
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="PAID"
+                    checked={payment === "PAID"}
+                    onChange={(e) =>
+                      setPayment(e.target.value)
+                    }
+                  />
+
+                  <span>Paid</span>
+                </label>
+
+              </div>
+
+            </div>
+
+            <button
+              type="submit"
+              className="place-order-button"
+              disabled={loading}
             >
-              <span>
-                {item.emoji} {item.name} ×{" "}
-                {item.cartQuantity}
-              </span>
+              {loading
+                ? "Placing Order..."
+                : "Place Order"}
+            </button>
+
+          </form>
+
+        </div>
+
+        <div className="checkout-right">
+
+          <div className="order-summary">
+
+            <h2>Order Summary</h2>
+
+            {cart.map((item) => (
+              <div
+                className="summary-item"
+                key={item.id}
+              >
+                <div>
+                  <strong>{item.name}</strong>
+
+                  <small>
+                    {item.cartQuantity} × ₹
+                    {Number(item.price || 0).toFixed(2)}
+                  </small>
+                </div>
+
+                <span>
+                  ₹
+                  {(
+                    Number(item.price || 0) *
+                    Number(item.cartQuantity || 0)
+                  ).toFixed(2)}
+                </span>
+              </div>
+            ))}
+
+            <div className="summary-total">
+              <strong>Total</strong>
 
               <strong>
-                ₹{item.price * item.cartQuantity}
+                ₹{Number(total).toFixed(2)}
               </strong>
             </div>
-          ))}
 
-          <hr />
-
-          <div className="summary-total">
-            <span>Total</span>
-            <strong>₹{total}</strong>
           </div>
 
         </div>
 
       </div>
 
-    </section>
+    </div>
   );
 }
 

@@ -1,6 +1,21 @@
 import { Link } from "react-router-dom";
 
-function FruitCard({ fruit }) {
+function FruitCard({ fruit, onAddToCart }) {
+  const handleAddToCart = () => {
+    const cartItem = {
+      id: fruit.id,
+      name: fruit.name,
+      price: Number(fruit.price || 0),
+      unit: fruit.unit,
+      emoji: fruit.emoji,
+      description: fruit.description,
+      category: fruit.category,
+      cartQuantity: 1
+    };
+
+    onAddToCart(cartItem);
+  };
+
   return (
     <div className="fruit-card">
 
@@ -24,16 +39,29 @@ function FruitCard({ fruit }) {
             ₹{fruit.price}/{fruit.unit}
           </strong>
 
-          <Link
-            to={`/fruit/${fruit.id}`}
-            className="view-button"
-          >
-            View
-          </Link>
+          <div className="fruit-actions">
+
+            <Link
+              to={`/fruit/${fruit.id}`}
+              className="view-button"
+            >
+              View
+            </Link>
+
+            <button
+              type="button"
+              className="add-cart-button"
+              onClick={handleAddToCart}
+            >
+              🛒 Add
+            </button>
+
+          </div>
 
         </div>
 
       </div>
+
     </div>
   );
 }
