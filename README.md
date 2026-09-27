@@ -86,3 +86,7 @@ Delivered
 http://localhost:5173/
 http://localhost:5173/orders
 http://localhost:5173/admin
+
+# 28092026 ::
+# ==============
+# added all the backend intigrations.
